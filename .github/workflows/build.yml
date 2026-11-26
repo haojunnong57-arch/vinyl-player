@@ -1,0 +1,133 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify sources
+        run: |
+          set -eo pipefail
+          {
+            echo "== swift sources:"
+            find VinylPlayer -name '*.swift' | sort
+            echo "== swift file count: $(find VinylPlayer -name '*.swift' | wc -l)"
+            echo "== head: $(git rev-parse --short HEAD)"
+          } 2>&1 | tee -a build.log
+
+      - name: Show toolchain
+        run: |
+          set -eo pipefail
+          {
+            xcodebuild -version
+            xcrun --sdk iphoneos --show-sdk-version
+            sw_vers
+            python3 --version
+          } 2>&1 | tee -a build.log
+
+      - name: Generate app icon
+        run: |
+          set -eo pipefail
+          {
+            python3 tools/make_icon.py
+            ls -lh VinylPlayer/Resources/Assets.xcassets/AppIcon.appiconset/
+          } 2>&1 | tee -a build.log
+
+      - name: Install XcodeGen
+        run: |
+          set -eo pipefail
+          {
+            brew install xcodegen
+            xcodegen --version
+          } 2>&1 | tee -a build.log
+
+      - name: Generate project
+        run: |
+          set -eo pipefail
+          {
+            xcodegen generate
+            echo "== pbxproj: $(ls -1 VinylPlayer.xcodeproj/project.pbxproj)"
+            echo "== swift refs: $(grep -oE '[A-Za-z0-9_]+\.swift' VinylPlayer.xcodeproj/project.pbxproj | sort -u | wc -l)"
+          } 2>&1 | tee -a build.log
+
+      - name: Build (unsigned)
+        run: |
+          set -eo pipefail
+          {
+            xcodebuild \
+              -project VinylPlayer.xcodeproj \
+              -scheme VinylPlayer \
+              -configuration Release \
+              -sdk iphoneos \
+              -derivedDataPath build \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              build
+          } 2>&1 | tee -a build.log
+
+      - name: Package IPA
+        if: always()
+        run: |
+          set -eo pipefail
+          {
+            APP_PATH="$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit || true)"
+            echo "app: ${APP_PATH}"
+            if [ -z "${APP_PATH}" ] || [ ! -f "${APP_PATH}/VinylPlayer" ]; then
+              echo "No runnable .app produced - build failed, skipping IPA."
+              exit 0
+            fi
+            rm -rf Payload VinylPlayer-unsigned.ipa
+            mkdir -p Payload
+            cp -R "${APP_PATH}" Payload/
+            zip -qry VinylPlayer-unsigned.ipa Payload
+            ls -lh VinylPlayer-unsigned.ipa
+            /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" Payload/*.app/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" Payload/*.app/Info.plist || true
+          } 2>&1 | tee -a build.log
+
+      - name: Publish build log and IPA
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          {
+            shopt -s nullglob
+            assets=(build.log)
+            if [ -f VinylPlayer-unsigned.ipa ]; then
+              assets+=(VinylPlayer-unsigned.ipa)
+            fi
+            if gh release view build-latest >/dev/null 2>&1; then
+              gh release upload build-latest "${assets[@]}" --clobber
+            else
+              gh release create build-latest \
+                --title "黑胶唱机 VinylPlayer - 最新构建" \
+                --notes "未签名 IPA：用 AltStore / Sideloadly 侧载，或 TrollStore 安装。附完整 xcodebuild 日志。" \
+                "${assets[@]}"
+            fi
+          } 2>&1 | tee -a build.log
+
+      - name: Upload workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinylplayer-build
+          path: |
+            build.log
+            VinylPlayer-unsigned.ipa
+          if-no-files-found: warn
+          retention-days: 30
