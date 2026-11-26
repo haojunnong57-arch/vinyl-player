@@ -96,6 +96,9 @@ def write_png(path, width, height, pixels):
 
 
 def main():
+    if os.path.exists(OUT) and os.path.getsize(OUT) > 1000:
+        print("icon already in repo, skip:", OUT)
+        return
     pixels = render()
     write_png(OUT, SIZE, SIZE, pixels)
     print("icon written:", OUT, os.path.getsize(OUT), "bytes")

@@ -6,6 +6,8 @@ struct SettingsSheet: View {
 
     @State private var cookie = NetEase.cookie
     @State private var saved = false
+    @State private var checking = false
+    @State private var checkResult: String?
 
     var body: some View {
         NavigationStack {
@@ -45,6 +47,17 @@ struct SettingsSheet: View {
                     }
                 }
 
+                Section("连接自检") {
+                    Button(checking ? "检测中…" : "检测网易云连通性") {
+                        Task { await runCheck() }
+                    }
+                    if let checkResult {
+                        Text(checkResult)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Section("关于") {
                     LabeledContent("版本", value: "2.0 (2)")
                     LabeledContent("标识", value: "com.haojunnong.vinylplayer")
@@ -61,5 +74,23 @@ struct SettingsSheet: View {
                 }
             }
         }
+    }
+
+    private func runCheck() async {
+        checking = true
+        do {
+            let albums = try await NetEaseClient.searchAlbums(keyword: "范特西", limit: 3)
+            guard let first = albums.first else {
+                checkResult = "搜索可用，但没返回专辑"
+                checking = false
+                return
+            }
+            let detail = try await NetEaseClient.albumDetail(id: first.id)
+            let url = detail.tracks.first?.streamURL?.absoluteString ?? "无"
+            checkResult = "搜索 OK · \(albums.count) 张\n专辑 OK · \(detail.tracks.count) 首\n试听：\(url)"
+        } catch {
+            checkResult = "失败：\(error.localizedDescription)"
+        }
+        checking = false
     }
 }

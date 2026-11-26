@@ -70,6 +70,7 @@ struct PillKey: View {
                 pill
                 labelView
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(PillPressStyle())
     }

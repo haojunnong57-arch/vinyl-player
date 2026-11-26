@@ -19,6 +19,7 @@ struct PlayerScreen: View {
                 tonearmLayer(w: w, h: h)
                 infoLayer(w: w, h: h)
                 controlLayer(w: w, h: h)
+                bannerLayer(w: w, h: h)
                 topBar(w: w, h: h)
             }
         }
@@ -71,7 +72,7 @@ struct PlayerScreen: View {
         )
         return disc
             .position(x: centerX, y: centerY)
-            .onTapGesture { engine.toggle() }
+            .simultaneousGesture(TapGesture().onEnded { engine.toggle() })
             .gesture(
                 DragGesture(minimumDistance: 40)
                     .onEnded { value in
@@ -132,6 +133,32 @@ struct PlayerScreen: View {
         return row.position(x: w * 0.5, y: h * 0.90)
     }
 
+
+    // MARK: 状态提示
+
+    private func bannerLayer(w: CGFloat, h: CGFloat) -> some View {
+        let showing: Bool = engine.loading || engine.message != nil
+        let text: String = engine.loading ? "正在连接网易云…" : (engine.message ?? "")
+        let bubble = HStack(spacing: 8) {
+            if engine.loading {
+                ProgressView().scaleEffect(0.7)
+            }
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8))
+        .foregroundStyle(.white)
+        .opacity(showing ? 1 : 0)
+        .animation(.easeInOut(duration: 0.25), value: showing)
+        .frame(maxWidth: w * 0.82)
+
+        return bubble.position(x: w * 0.5, y: h * 0.115)
+    }
+
     // MARK: 顶部小按钮
 
     private func topBar(w: CGFloat, h: CGFloat) -> some View {
@@ -152,7 +179,8 @@ struct PlayerScreen: View {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(color)
-                .frame(width: 30, height: 30)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

@@ -115,9 +115,17 @@ final class AudioEngine: NSObject, ObservableObject {
         elapsed = clamped
     }
 
+    private func flash(_ text: String) {
+        message = text
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if self.message == text { self.message = nil }
+        }
+    }
+
     private func startCurrent() {
         guard let track = track, let url = NetEaseClient.playableURL(for: track) else {
-            message = "这首歌拿不到播放地址"
+            flash("这首歌拿不到播放地址")
             return
         }
         loading = true
@@ -131,7 +139,7 @@ final class AudioEngine: NSObject, ObservableObject {
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             self.loading = false
             if let err = self.player.currentItem?.error {
-                self.message = "这首歌放不了（\(err.localizedDescription)）。会员曲目请在设置里填 cookie。"
+                self.flash("放不了：\(err.localizedDescription)。会员曲目请在设置里填 cookie。")
             }
         }
     }
