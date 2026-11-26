@@ -1,42 +1,33 @@
 import Foundation
-import MediaPlayer
-import SwiftUI
+import UIKit
 
-struct VinylTrack: Identifiable, Equatable {
-    let id: String
-    let title: String
+struct Album: Identifiable, Equatable {
+    let id: Int64
+    let name: String
     let artist: String
-    let duration: TimeInterval
-    let art: UIImage?
+    let coverURL: URL?
+    let tracks: [Track]
+    var cover: UIImage?
+    var tint: UIColor?
 
+    static func == (lhs: Album, rhs: Album) -> Bool { lhs.id == rhs.id }
+}
+
+struct Track: Identifiable, Equatable {
+    let id: Int64
+    let name: String
+    let artist: String
+    let albumName: String
+    let duration: TimeInterval
+    let coverURL: URL?
+
+    /// 3'57" 这种写法，和谜底黑胶的曲目表一致
     var durationText: String {
         let total = Int(duration.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
+        return "\(total / 60)'\(String(format: "%02d", total % 60))\""
     }
-}
 
-/// 一张唱片。演示专辑没有 mediaItems，真实专辑带着音乐库条目。
-struct VinylAlbum: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let artist: String
-    let year: String
-    let art: UIImage?
-    let tracks: [VinylTrack]
-    let palette: Palette
-    let mediaItems: [MPMediaItem]
-
-    static func == (lhs: VinylAlbum, rhs: VinylAlbum) -> Bool {
-        lhs.id == rhs.id
+    var streamURL: URL? {
+        URL(string: "https://music.163.com/song/media/outer/url?id=\(id).mp3")
     }
-}
-
-struct Palette: Equatable {
-    let top: Color
-    let bottom: Color
-
-    static let fallback = Palette(
-        top: Color(red: 0.18, green: 0.20, blue: 0.28),
-        bottom: Color(red: 0.08, green: 0.09, blue: 0.13)
-    )
 }
