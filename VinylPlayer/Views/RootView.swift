@@ -41,12 +41,14 @@ struct RootView: View {
         guard engine.album == nil else { return }
         do {
             let found = try await NetEaseClient.searchAlbums(keyword: "范特西", limit: 20)
-            library = found
+            library = found + DemoCatalog.albums
             if let first = found.first {
                 await select(first)
             }
         } catch {
-            engine.message = error.localizedDescription
+            library = DemoCatalog.albums
+            if let first = library.first { engine.play(album: first) }
+            engine.message = "网易云连不上（\(error.localizedDescription)），先用本地演示唱片。"
         }
     }
 

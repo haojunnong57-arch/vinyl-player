@@ -155,6 +155,7 @@ struct PlayerScreen: View {
         .opacity(showing ? 1 : 0)
         .animation(.easeInOut(duration: 0.25), value: showing)
         .frame(maxWidth: w * 0.82)
+        .allowsHitTesting(false)
 
         return bubble.position(x: w * 0.5, y: h * 0.115)
     }

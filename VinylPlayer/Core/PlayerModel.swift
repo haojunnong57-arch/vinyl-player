@@ -17,6 +17,7 @@ final class AudioEngine: NSObject, ObservableObject {
 
     private let player = AVPlayer()
     private var timeObserver: Any?
+    private var demoTimer: Timer?
 
     var track: Track? {
         guard let album, album.tracks.indices.contains(index) else { return album?.tracks.first }
@@ -80,8 +81,11 @@ final class AudioEngine: NSObject, ObservableObject {
         if isPlaying {
             player.pause()
             isPlaying = false
+            stopDemo()
         } else {
-            if player.currentItem == nil {
+            if let current = track, current.streamURL == nil {
+                startDemo(track: current)
+            } else if player.currentItem == nil {
                 startCurrent()
             } else {
                 player.play()
@@ -124,8 +128,13 @@ final class AudioEngine: NSObject, ObservableObject {
     }
 
     private func startCurrent() {
-        guard let track = track, let url = NetEaseClient.playableURL(for: track) else {
-            flash("这首歌拿不到播放地址")
+        guard let track = track else {
+            flash("没有可播放的曲目")
+            return
+        }
+        guard let url = NetEaseClient.playableURL(for: track) else {
+            startDemo(track: track)
+            pushNowPlaying()
             return
         }
         loading = true
@@ -142,6 +151,29 @@ final class AudioEngine: NSObject, ObservableObject {
                 self.flash("放不了：\(err.localizedDescription)。会员曲目请在设置里填 cookie。")
             }
         }
+    }
+
+    // MARK: 演示播放（无音频，仅推进度）
+
+    private func startDemo(track: Track) {
+        stopDemo()
+        duration = track.duration > 0 ? track.duration : 180
+        elapsed = 0
+        isPlaying = true
+        demoTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.demoTick() }
+        }
+    }
+
+    private func demoTick() {
+        guard isPlaying else { return }
+        elapsed += 0.25
+        if duration > 0, elapsed >= duration { next() }
+    }
+
+    private func stopDemo() {
+        demoTimer?.invalidate()
+        demoTimer = nil
     }
 
     // MARK: 锁屏 / 耳机控制
