@@ -1,30 +1,23 @@
 import SwiftUI
 
-/// 唱片内页：点封面翻到曲目列表，和拆开唱片封套一样。
-struct SleeveView: View {
-    @ObservedObject var model: PlayerModel
+/// 曲目内页：编号 + 点线 + 3'57" 时长，和截图里的曲目表一致。
+struct TrackListSheet: View {
+    @ObservedObject var engine: AudioEngine
     @Environment(\.dismiss) private var dismiss
-    @State private var flipped = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
-                    flipCard
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.45)) { flipped.toggle() }
-                        }
-
-                    Text(flipped ? "轻点卡片翻回封面" : "轻点卡片查看曲目")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-
-                    trackList
+                VStack(spacing: 0) {
+                    header
+                    ForEach(Array((engine.album?.tracks ?? []).enumerated()), id: \.element.id) { offset, track in
+                        row(offset: offset, track: track)
+                    }
                 }
-                .padding(18)
+                .padding(.bottom, 30)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle(model.current?.title ?? "内页")
+            .background(Color(.systemBackground))
+            .navigationTitle(engine.album?.name ?? "曲目")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -34,140 +27,96 @@ struct SleeveView: View {
         }
     }
 
-    private var flipCard: some View {
-        ZStack {
-            coverCard
-                .opacity(flipped ? 0 : 1)
-                .rotation3DEffect(.degrees(flipped ? -90 : 0), axis: (x: 0, y: 1, z: 0))
-
-            backCard
-                .opacity(flipped ? 1 : 0)
-                .rotation3DEffect(.degrees(flipped ? 0 : 90), axis: (x: 0, y: 1, z: 0))
-        }
-        .frame(height: 300)
-        .frame(maxWidth: .infinity)
-    }
-
-    private var coverCard: some View {
-        ZStack(alignment: .bottomLeading) {
-            if let art = model.current?.art {
-                Image(uiImage: art)
+    private var header: some View {
+        let art: some View = Group {
+            if let cover = engine.cover {
+                Image(uiImage: cover)
                     .resizable()
                     .scaledToFill()
             } else {
-                LinearGradient(
-                    colors: [
-                        model.current?.palette.top ?? Palette.fallback.top,
-                        model.current?.palette.bottom ?? Palette.fallback.bottom
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                VStack {
-                    Spacer()
-                    Image(systemName: "opticaldisc.fill")
-                        .font(.system(size: 110, weight: .thin))
-                        .foregroundStyle(.white.opacity(0.18))
-                    Spacer()
-                }
+                Color.secondary.opacity(0.2)
             }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(model.current?.title ?? "")
-                    .font(.system(size: 20, weight: .bold, design: .serif))
-                Text(model.current?.artist ?? "")
-                    .font(.system(size: 13, weight: .medium))
-                    .opacity(0.85)
-            }
-            .foregroundStyle(.white)
-            .padding(16)
-            .shadow(radius: 6)
         }
-        .frame(height: 300)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.3), radius: 16, y: 8)
-    }
+        let artwork = art
+            .frame(width: 120, height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-    private var backCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("曲目")
-                    .font(.system(size: 13, weight: .semibold))
-                    .opacity(0.6)
-                Spacer()
-                Text("\(model.current?.tracks.count ?? 0) 首")
-                    .font(.system(size: 11, design: .monospaced))
-                    .opacity(0.45)
-            }
+        let name = Text(engine.album?.name ?? "")
+            .font(.system(size: 22, weight: .heavy))
+            .lineLimit(2)
+        let artist = Text(engine.album?.artist ?? "")
+            .font(.system(size: 13))
+            .foregroundStyle(.secondary)
+        let count = Text("\(engine.album?.tracks.count ?? 0) 首")
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .foregroundStyle(.secondary)
 
-            ForEach(Array((model.current?.tracks ?? []).enumerated()), id: \.element.id) { offset, track in
-                HStack(spacing: 10) {
-                    Text(String(format: "%02d", offset + 1))
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .opacity(0.4)
-                        .frame(width: 22, alignment: .leading)
-                    Text(track.title)
-                        .font(.system(size: 14, weight: offset == model.trackIndex ? .semibold : .regular))
-                        .lineLimit(1)
-                    Spacer()
-                    Text(track.durationText)
-                        .font(.system(size: 11, design: .monospaced))
-                        .opacity(0.45)
-                }
-                .foregroundStyle(offset == model.trackIndex ? model.theme.accent : .primary)
-            }
+        let text = VStack(alignment: .leading, spacing: 6) {
+            name
+            artist
+            count
+        }
 
+        let row = HStack(alignment: .top, spacing: 14) {
+            artwork
+            text
             Spacer(minLength: 0)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 300)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+        return row.padding(18)
     }
 
-    private var trackList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array((model.current?.tracks ?? []).enumerated()), id: \.element.id) { offset, track in
-                Button {
-                    if let album = model.current {
-                        model.play(album: album, index: offset)
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: offset == model.trackIndex && model.isPlaying
-                              ? "waveform" : "opticaldisc")
-                            .font(.system(size: 15))
-                            .frame(width: 24)
-                            .foregroundStyle(offset == model.trackIndex ? model.theme.accent : .secondary)
+    private func row(offset: Int, track: Track) -> some View {
+        let active: Bool = offset == engine.index
+        let number = Text(String(format: "%02d", offset + 1))
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .frame(width: 26, alignment: .leading)
+        let title = Text(track.name)
+            .font(.system(size: 15, weight: active ? .semibold : .regular))
+            .foregroundStyle(active ? Color.accentColor : Color.primary)
+            .lineLimit(1)
+        let leader = DottedLeader()
+        let duration = Text(track.durationText)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.secondary)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(track.title)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(.primary)
-                            Text(track.artist)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text(track.durationText)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 11)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                if offset < (model.current?.tracks.count ?? 0) - 1 {
-                    Divider().padding(.leading, 36)
-                }
-            }
+        let content = HStack(spacing: 8) {
+            number
+            title
+            leader
+            duration
         }
-        .padding(.horizontal, 14)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 11)
+        .contentShape(Rectangle())
+
+        return Button {
+            if let album = engine.album {
+                engine.play(album: album, index: offset)
+            }
+        } label: {
+            content
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct DottedLeader: View {
+    var body: some View {
+        Line()
+            .stroke(style: StrokeStyle(lineWidth: 1, dash: [1, 4]))
+            .foregroundStyle(Color.secondary.opacity(0.5))
+            .frame(height: 1)
+            .frame(minWidth: 12)
+    }
+}
+
+struct Line: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.width, y: rect.midY))
+        return path
     }
 }

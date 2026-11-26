@@ -1,71 +1,94 @@
 import SwiftUI
 
+/// 底部三个胶囊键，键下挂文字 / 图标标注 —— 截图里就是这种实物按键感。
 struct TransportBar: View {
-    @ObservedObject var model: PlayerModel
+    @ObservedObject var engine: AudioEngine
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Text(model.currentTrack?.title ?? "未在播放")
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 6)
-                Text("\(timeText(model.elapsed)) / \(timeText(model.duration))")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .opacity(0.6)
-            }
+        let light: Bool = engine.isLightBackground
+        let fill: Color = light ? Color.black.opacity(0.80) : Color.black.opacity(0.72)
+        let labelColor: Color = light ? Color.black.opacity(0.70) : Color.white.opacity(0.88)
 
-            Slider(
-                value: Binding(
-                    get: { model.elapsed },
-                    set: { model.seek(to: $0) }
-                ),
-                in: 0...max(model.duration, 1)
-            )
-            .tint(model.theme.accent)
+        let playCaption: String = engine.isPlaying ? "PAUSE" : "PLAY"
+        let play = PillKey(
+            caption: playCaption,
+            icon: nil,
+            widthRatio: 0.26,
+            fill: fill,
+            labelColor: labelColor,
+            action: { engine.toggle() }
+        )
+        let back = PillKey(
+            caption: nil,
+            icon: "backward.end.fill",
+            widthRatio: 0.18,
+            fill: fill,
+            labelColor: labelColor,
+            action: { engine.previous() }
+        )
+        let forward = PillKey(
+            caption: nil,
+            icon: "forward.end.fill",
+            widthRatio: 0.18,
+            fill: fill,
+            labelColor: labelColor,
+            action: { engine.next() }
+        )
 
-            HStack(spacing: 44) {
-                Button {
-                    model.previous()
-                } label: {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    model.playPause()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(model.theme.accent)
-                            .frame(width: 62, height: 62)
-                            .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
-                        Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 23, weight: .bold))
-                            .foregroundStyle(model.theme.plinthBottom)
-                            .offset(x: model.isPlaying ? 0 : 1.5)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    model.next()
-                } label: {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-            }
-            .foregroundStyle(model.theme.ink)
+        return HStack(alignment: .top, spacing: 0) {
+            play
+            Spacer(minLength: 0)
+            back
+            Spacer().frame(width: 18)
+            forward
         }
-        .foregroundStyle(model.theme.ink)
     }
+}
 
-    private func timeText(_ time: TimeInterval) -> String {
-        let total = Int(time.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
+struct PillKey: View {
+    let caption: String?
+    let icon: String?
+    let widthRatio: CGFloat
+    let fill: Color
+    let labelColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        GeometryReader { geo in
+            let width: CGFloat = geo.size.width * widthRatio * 3.85
+            let height: CGFloat = 36
+            let pill = RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+                .fill(fill)
+                .frame(width: width, height: height)
+                .overlay(
+                    RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.8)
+                )
+
+            let label = Group {
+                if let caption {
+                    Text(caption)
+                        .font(.system(size: 9, weight: .bold))
+                        .kerning(1.4)
+                        .foregroundStyle(labelColor)
+                } else if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(labelColor)
+                }
+            }
+
+            let stack = VStack(spacing: 9) {
+                pill
+                label
+            }
+
+            Button(action: action) {
+                stack
+            }
+            .buttonStyle(.plain)
+            .position(x: geo.size.width / 2, y: height + 18)
+        }
+        .frame(height: 62)
     }
 }

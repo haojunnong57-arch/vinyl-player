@@ -1,82 +1,56 @@
 import SwiftUI
 
 struct SettingsSheet: View {
-    @ObservedObject var model: PlayerModel
+    @ObservedObject var engine: AudioEngine
     @Environment(\.dismiss) private var dismiss
+
+    @State private var cookie = NetEase.cookie
+    @State private var saved = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("唱机材质") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 12)], spacing: 12) {
-                        ForEach(DeckTheme.all) { theme in
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    model.themeID = theme.id
-                                }
-                            } label: {
-                                VStack(spacing: 6) {
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [theme.plinthTop, theme.plinthBottom],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(height: 46)
-                                        .overlay(
-                                            Circle()
-                                                .fill(theme.accent)
-                                                .frame(width: 14, height: 14)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                                .stroke(
-                                                    model.themeID == theme.id ? Color.accentColor : Color.clear,
-                                                    lineWidth: 2
-                                                )
-                                        )
-                                    Text(theme.name)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(.primary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                }
-
-                Section("转速") {
-                    Picker("转速", selection: Binding(
-                        get: { model.rpm < 40 ? 0 : 1 },
-                        set: { model.rpm = $0 == 0 ? 33.333 : 45 }
-                    )) {
-                        Text("33⅓ RPM").tag(0)
-                        Text("45 RPM").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("音源") {
-                    LabeledContent("当前", value: model.sourceLabel)
-                    if let notice = model.notice {
-                        Text(notice)
-                            .font(.system(size: 12))
+                Section("网易云账号") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("MUSIC_U cookie（会员曲目需要）")
+                            .font(.system(size: 12, weight: .medium))
+                        TextEditor(text: $cookie)
+                            .frame(minHeight: 90)
+                            .font(.system(size: 11, design: .monospaced))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 0.8)
+                            )
+                        Text("桌面浏览器登录 music.163.com，F12 → Application → Cookies，复制 MUSIC_U 那段值，写成 MUSIC_U=xxxxx。")
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
-                    Button("重新读取音乐库") {
-                        Task { await model.loadLibraryIfPossible() }
+                    .padding(.vertical, 4)
+
+                    Button(saved ? "已保存" : "保存") {
+                        NetEase.cookie = cookie.trimmingCharacters(in: .whitespacesAndNewlines)
+                        saved = true
+                        engine.message = "cookie 已保存"
                     }
-                    Text("真实播放走系统音乐 App；没授权或库里没专辑时用内置演示唱片，唱片照样转。")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                }
+
+                Section("当前播放") {
+                    LabeledContent("专辑", value: engine.album?.name ?? "—")
+                    LabeledContent("曲目", value: engine.track?.name ?? "—")
+                    LabeledContent("音源", value: "网易云直连")
+                    if let message = engine.message {
+                        Text(message)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("关于") {
-                    LabeledContent("版本", value: "1.0 (1)")
+                    LabeledContent("版本", value: "2.0 (2)")
                     LabeledContent("标识", value: "com.haojunnong.vinylplayer")
+                    Text("界面参照谜底黑胶的公开截图重做：整屏封面底色、出血黑胶、右上唱臂、底部胶囊键、3D 唱片架、点线曲目表。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("设置")
