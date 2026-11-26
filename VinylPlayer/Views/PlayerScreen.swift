@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PlayerScreen: View {
     @ObservedObject var engine: AudioEngine
-    let onOpenLibrary: () -> Void
+    let onBack: () -> Void
     let onOpenTracks: () -> Void
     let onOpenSearch: () -> Void
     let onOpenSettings: () -> Void
@@ -78,8 +78,8 @@ struct PlayerScreen: View {
             .gesture(
                 DragGesture(minimumDistance: 40)
                     .onEnded { value in
-                        if value.translation.height < -50 { onOpenLibrary() }
-                        if value.translation.height > 50 { onOpenTracks() }
+                        if value.translation.height < -50 { onOpenTracks() }
+                        if value.translation.height > 50 { onBack() }
                     }
             )
     }
@@ -194,12 +194,16 @@ struct PlayerScreen: View {
         let search = ghostButton(icon: "magnifyingglass", color: color, action: onOpenSearch)
         let list = ghostButton(icon: "list.bullet", color: color, action: onOpenTracks)
         let gear = ghostButton(icon: "slider.horizontal.3", color: color, action: onOpenSettings)
+        let back = ghostButton(icon: "chevron.down", color: color, action: onBack)
         let row = HStack(spacing: 18) {
             search
             list
             gear
         }
-        return row.position(x: w * 0.80, y: h * 0.075)
+        return ZStack {
+            row.position(x: w * 0.80, y: h * 0.078)
+            back.position(x: w * 0.11, y: h * 0.078)
+        }
     }
 
     private func ghostButton(icon: String, color: Color, action: @escaping () -> Void) -> some View {

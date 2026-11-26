@@ -12,6 +12,32 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("音乐提供商") {
+                    Picker("提供商", selection: .constant("netease")) {
+                        Text("网易云音乐").tag("netease")
+                        Text("Apple Music").tag("apple")
+                        Text("Spotify").tag("spotify")
+                    }
+                    Text("原版读 Apple Music / Spotify 的系统正在播放；这一版直连网易云，搜索、专辑、试听都在 App 内完成。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("播放模式") {
+                    Picker("模式", selection: .constant("inapp")) {
+                        Text("谜底黑胶内播放").tag("inapp")
+                        Text("跟随系统播放器").tag("system")
+                    }
+                    .pickerStyle(.inline)
+                }
+
+                Section("主题") {
+                    LabeledContent("当前", value: "黑胶 · 经典")
+                    Text("原版含黑胶与收音机两种风格，收音机风格这块还没做。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("网易云账号") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("MUSIC_U cookie（会员曲目需要）")
