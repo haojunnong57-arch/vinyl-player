@@ -78,19 +78,19 @@ struct SettingsSheet: View {
 
     private func runCheck() async {
         checking = true
+        let raw = await NetEaseClient.probe(keyword: "范特西")
         do {
             let albums = try await NetEaseClient.searchAlbums(keyword: "范特西", limit: 3)
-            guard let first = albums.first else {
-                checkResult = "搜索可用，但没返回专辑"
-                checking = false
-                return
+            if let first = albums.first {
+                let detail = try await NetEaseClient.albumDetail(id: first.id)
+                checkResult = "搜索 \(albums.count) 张 · 专辑 \(detail.tracks.count) 首\n\(raw.prefix(200))"
+            } else {
+                checkResult = "搜索无结果\n\(raw.prefix(200))"
             }
-            let detail = try await NetEaseClient.albumDetail(id: first.id)
-            let url = detail.tracks.first?.streamURL?.absoluteString ?? "无"
-            checkResult = "搜索 OK · \(albums.count) 张\n专辑 OK · \(detail.tracks.count) 首\n试听：\(url)"
         } catch {
-            checkResult = "失败：\(error.localizedDescription)"
+            checkResult = "失败：\(error.localizedDescription)\n\(raw.prefix(200))"
         }
         checking = false
     }
+
 }

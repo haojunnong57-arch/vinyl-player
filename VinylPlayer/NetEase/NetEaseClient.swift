@@ -142,4 +142,30 @@ enum NetEaseClient {
         }
         return URL(string: url)
     }
+
+    /// 原始探测：HTTP 状态 + 响应前 300 字，用来判断卡在哪一步
+    static func probe(keyword: String) async -> String {
+        guard let url = URL(string: "https://music.163.com/api/search/get/web") else {
+            return "URL 拼装失败"
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue(NetEase.userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+        if !NetEase.cookie.isEmpty {
+            request.setValue(NetEase.cookie, forHTTPHeaderField: "Cookie")
+        }
+        let encoded = "s=\(keyword.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? keyword)&type=10&limit=3&offset=0"
+        request.httpBody = encoded.data(using: .utf8)
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let head = String(data: data.prefix(300), encoding: .utf8) ?? "<非文本响应>"
+            return "HTTP \(code)\n\(head)"
+        } catch {
+            return "请求失败：\(error.localizedDescription)"
+        }
+    }
 }

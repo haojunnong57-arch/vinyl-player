@@ -8,6 +8,7 @@ struct PlayerScreen: View {
     let onOpenSettings: () -> Void
 
     @State private var dragOffset: CGFloat = 0
+    @State private var armAngle: Double = -26
 
     var body: some View {
         GeometryReader { geo in
@@ -72,6 +73,7 @@ struct PlayerScreen: View {
         )
         return disc
             .position(x: centerX, y: centerY)
+            .onTapGesture(count: 2) { onOpenTracks() }
             .simultaneousGesture(TapGesture().onEnded { engine.toggle() })
             .gesture(
                 DragGesture(minimumDistance: 40)
@@ -88,11 +90,36 @@ struct PlayerScreen: View {
         let size: CGFloat = w * 0.98
         let pivotX: CGFloat = w * 0.865
         let pivotY: CGFloat = h * 0.215
-        let arm = TonearmView(size: size, engaged: engine.isPlaying)
+        let arm = TonearmView(size: size, angle: armAngle)
         return arm
             .frame(width: size, height: size)
             .position(x: pivotX, y: pivotY)
-            .allowsHitTesting(false)
+            .gesture(armGesture)
+            .onChange(of: engine.isPlaying) { _, playing in
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.72)) {
+                    armAngle = playing ? -34 : -26
+                }
+            }
+    }
+
+    /// 拖动唱臂：角度直接映射成播放进度；松手决定播放还是暂停
+    private var armGesture: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { value in
+                let raw: Double = -26 + Double(value.translation.height) * 0.12
+                let clamped: Double = min(-6, max(-42, raw))
+                armAngle = clamped
+                let ratio: Double = (-clamped - 6) / 36.0
+                if engine.duration > 0 {
+                    engine.seek(ratio * engine.duration)
+                }
+            }
+            .onEnded { _ in
+                let onDisc: Bool = armAngle < -20
+                if onDisc != engine.isPlaying {
+                    engine.toggle()
+                }
+            }
     }
 
     // MARK: 标题

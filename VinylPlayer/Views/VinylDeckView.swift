@@ -126,18 +126,17 @@ struct VinylDisc: View {
     }
 }
 
-/// 唱臂：透明轴心片 + 黑色配重 + 银色臂杆 + 黑色唱头。
+/// 唱臂：可拖动。拖动角同时映射成播放进度；松手后落在盘上就播，抬起来就暂停。
 struct TonearmView: View {
     let size: CGFloat
-    let engaged: Bool
-
-    private var angle: Double { engaged ? -34 : -26 }
+    let angle: Double
 
     var body: some View {
         ZStack(alignment: .top) {
             pivotPlate
             arm
         }
+        .frame(width: size, height: size, alignment: .top)
     }
 
     private var pivotPlate: some View {
@@ -158,7 +157,6 @@ struct TonearmView: View {
     private var arm: some View {
         let rodHeight: CGFloat = size * 0.50
         let rodWidth: CGFloat = size * 0.014
-        let counter = counterweight
         let rod = Capsule()
             .fill(
                 LinearGradient(
@@ -168,15 +166,13 @@ struct TonearmView: View {
                 )
             )
             .frame(width: rodWidth, height: rodHeight)
-        let head = headshell
         let stack = VStack(spacing: 0) {
-            counter
+            counterweight
             rod
-            head
+            headshell
         }
         .rotationEffect(.degrees(angle), anchor: .top)
         .offset(y: size * 0.02)
-        .animation(.spring(response: 0.8, dampingFraction: 0.7), value: engaged)
         return stack
     }
 
@@ -195,7 +191,6 @@ struct TonearmView: View {
     private var headshell: some View {
         let w: CGFloat = size * 0.105
         let h: CGFloat = size * 0.040
-        let radians: Double = 22 * Double.pi / 180
         let body = RoundedRectangle(cornerRadius: size * 0.008, style: .continuous)
             .fill(Color(white: 0.08))
             .frame(width: w, height: h)
@@ -204,7 +199,7 @@ struct TonearmView: View {
         let stylus: some View = Rectangle()
             .fill(Color(white: 0.03))
             .frame(width: size * 0.006, height: size * 0.022)
-            .offset(x: -w * 0.32 + CGFloat(cos(radians)) * w * 0.30, y: h * 0.2 + CGFloat(sin(radians)) * w * 0.30)
+            .offset(x: -w * 0.32 + size * 0.028, y: h * 0.2 + size * 0.012)
         return ZStack {
             body
             stylus
