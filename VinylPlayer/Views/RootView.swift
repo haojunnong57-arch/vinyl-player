@@ -3,33 +3,49 @@ import SwiftUI
 struct RootView: View {
     @StateObject private var engine = AudioEngine()
     @State private var library: [Album] = []
-    @State private var showLibrary = false
-    @State private var showTracks = false
+    @State private var selected: Album?
     @State private var showSearch = false
     @State private var showSettings = false
 
     var body: some View {
-        PlayerScreen(
-            engine: engine,
-            onOpenLibrary: { showLibrary = true },
-            onOpenTracks: { showTracks = true },
-            onOpenSearch: { showSearch = true },
-            onOpenSettings: { showSettings = true }
-        )
-        .task { await bootstrap() }
-        .sheet(isPresented: $showLibrary) {
-            LibraryStackView(albums: library, currentID: engine.album?.id) { album in
-                showLibrary = false
-                Task { await select(album) }
+        ZStack {
+            if let album = selected {
+                PlayerScreen(
+                    engine: engine,
+                    onBack: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) {
+                            selected = nil
+                        }
+                    },
+                    onOpenTracks: {
+                        showSearch = false
+                        showTracks = true
+                    },
+                    onOpenSearch: { showSearch = true },
+                    onOpenSettings: { showSettings = true }
+                )
+                .transition(.move(edge: .bottom))
+            } else {
+                HomeView(
+                    albums: library,
+                    currentID: album?.id,
+                    onSelect: { picked in
+                        Task { await open(picked) }
+                    },
+                    onSearch: { showSearch = true },
+                    onSettings: { showSettings = true }
+                )
+                .transition(.opacity)
             }
         }
+        .task { await bootstrap() }
         .sheet(isPresented: $showTracks) {
             TrackListSheet(engine: engine)
         }
         .sheet(isPresented: $showSearch) {
             SearchSheet { album in
                 showSearch = false
-                Task { await select(album) }
+                Task { await open(album, jumpToPlayer: true) }
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -37,22 +53,22 @@ struct RootView: View {
         }
     }
 
+    @State private var showTracks = false
+
+    private var album: Album? { engine.album }
+
     private func bootstrap() async {
-        guard engine.album == nil else { return }
+        guard library.isEmpty else { return }
         do {
             let found = try await NetEaseClient.searchAlbums(keyword: "范特西", limit: 20)
             library = found + DemoCatalog.albums
-            if let first = found.first {
-                await select(first)
-            }
         } catch {
             library = DemoCatalog.albums
-            if let first = library.first { engine.play(album: first) }
             engine.message = "网易云连不上（\(error.localizedDescription)），先用本地演示唱片。"
         }
     }
 
-    private func select(_ album: Album) async {
+    private func open(_ album: Album, jumpToPlayer: Bool = true) async {
         var target = album
         if target.tracks.isEmpty {
             do {
@@ -64,11 +80,16 @@ struct RootView: View {
         }
         target.cover = await Artwork.load(target.coverURL)
         target.tint = Artwork.tint(from: target.cover)
-        if let existing = library.firstIndex(where: { $0.id == target.id }) {
-            library[existing] = target
+        if let index = library.firstIndex(where: { $0.id == target.id }) {
+            library[index] = target
         } else {
             library.append(target)
         }
         engine.play(album: target)
+        if jumpToPlayer {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
+                selected = target
+            }
+        }
     }
 }
